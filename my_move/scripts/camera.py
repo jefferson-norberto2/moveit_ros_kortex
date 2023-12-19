@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 
-from rospy import init_node, loginfo, Publisher, Timer, Duration, spin
-import png
-import json
+from rospy import init_node, loginfo, Publisher, Subscriber, Timer, Duration, spin
 import logging
 logging.basicConfig(level=logging.INFO)
-import numpy as np
-import cv2
-import time
-import os
 from geometry_msgs.msg import Vector3
+from geometry_msgs.msg._PoseStamped import PoseStamped
 
 class Camera:
     def __init__(self):
@@ -18,13 +13,17 @@ class Camera:
             self.robot_name = "my_gen3_lite"
             loginfo("Using robot_name " + self.robot_name)
 
-            self.publisher_position = Publisher('move_robot', Vector3, queue_size=10)
+            self.publisher_position = Publisher("move_robot", PoseStamped, queue_size=10)
+
+            self.subscriber_pose = Subscriber("new_move", PoseStamped, self.new_pose_callback, queue_size=10)
 
             self.timer_pub = Timer(Duration(secs=5), self.timer_callback)
 
-            self.x = 0.4
-            self.y = 0.3
-            self.z = 0.4
+            self.x = 0.3
+            self.y = 0.2
+            self.z = 0.5
+
+            self.stop_timer = True
 
             self.is_initialized = True
         except Exception as e:
@@ -32,12 +31,25 @@ class Camera:
             self.is_initialized = False
     
     def timer_callback(self, event):
-        msg = Vector3()
-        msg.x = self.x
-        msg.y = self.y
-        msg.z = self.z
-        loginfo("Publiquei o x" + str(msg.x))
+        msg = PoseStamped()
+        
+        msg.pose.position.x = self.x
+        msg.pose.position.y = self.y
+        msg.pose.position.z = self.z
+
+        loginfo("Publiquei x: " + str(msg.pose.position.x))
         self.publisher_position.publish(msg)
+    
+    def new_pose_callback(self, msg: PoseStamped):
+        self.x = msg.pose.position.x
+        self.y = msg.pose.position.y
+        self.z = msg.pose.position.z
+        loginfo("Atualizou a pose x:" + str(msg.pose.position.x))
+        if self.stop_timer:
+            self.timer_pub.shutdown()
+            self.stop_timer = False
+        self.timer_callback(None)
+
             
     def main(self):
         spin()
