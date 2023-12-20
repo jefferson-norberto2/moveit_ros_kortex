@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 from moveit_commander import RobotCommander, PlanningSceneInterface, MoveGroupCommander, roscpp_initialize
-from rospy import loginfo, spin, init_node, Subscriber, Publisher, DEBUG
+from rospy import loginfo, spin, init_node, Subscriber, Publisher, DEBUG, Timer, Duration
 from geometry_msgs.msg._PoseStamped import PoseStamped
 
 class PlanningMoveit():
@@ -9,7 +9,8 @@ class PlanningMoveit():
     loginfo('Starting the Initialization')
 
     self.subcriber_move = Subscriber("move_robot", PoseStamped, self.my_move_callback, queue_size=10)
-    self.publisher_pose = Publisher("new_move", PoseStamped, queue_size=10)
+    self.publisher_pose = Publisher("my_joints", PoseStamped, queue_size=10)
+    self.timer_pub = Timer(Duration(2), self.publish_joints)
 
     joint_state_topic = ['joint_states:=/my_gen3_lite/joint_states']
     roscpp_initialize(joint_state_topic)
@@ -25,11 +26,15 @@ class PlanningMoveit():
     self.move_group.set_num_planning_attempts(20)
     self.move_group.set_planning_time(4)
     print("planner query id -- ", self.move_group.get_planner_id())
+
+  def publish_joints(self):
+    joinsts = self.move_group.get_joints()
+    print("joints", joinsts)
+    print("type", type(joinsts))
   
   def my_move_callback(self, msg: PoseStamped):
     print("Recebi o x", msg.pose.position.x)
     current_pose = self.get_cartesian_pose()
-    self.publisher_pose.publish(current_pose)
     
     new_pose = current_pose
     new_pose.pose.position.x = msg.pose.position.x

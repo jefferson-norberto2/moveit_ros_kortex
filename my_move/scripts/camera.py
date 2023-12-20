@@ -1,59 +1,44 @@
-#!/usr/bin/env python3
+from abc import ABC, abstractmethod
+from cv2 import VideoCapture
+from numpy import ndarray
 
-from rospy import init_node, loginfo, Publisher, Subscriber, Timer, Duration, spin
-import logging
-logging.basicConfig(level=logging.INFO)
-from geometry_msgs.msg import Vector3
-from geometry_msgs.msg._PoseStamped import PoseStamped
 
-class Camera:
+class Camera(ABC):
+    @abstractmethod
     def __init__(self):
-        try:
-            init_node("camera")
-            self.robot_name = "my_gen3_lite"
-            loginfo("Using robot_name " + self.robot_name)
+        self.__mtx: ndarray
+        self.__dist: ndarray
+        self.__cap_number: int
+        self.__cv_cap_read = VideoCapture
 
-            self.publisher_position = Publisher("move_robot", PoseStamped, queue_size=10)
+    @abstractmethod
+    def get_cap(self):
+        '''
+        Get the camera capture.
+        '''
+        pass
 
-            self.subscriber_pose = Subscriber("new_move", PoseStamped, self.new_pose_callback, queue_size=10)
+    @abstractmethod
+    def release_camera(self):
+        '''
+        Release the camera.
+        '''
+        pass
 
-            self.timer_pub = Timer(Duration(secs=5), self.timer_callback)
+    @abstractmethod
+    def get_mtx(self):
+        '''
+        Get the camera matrix.
+        '''
+        pass
 
-            self.x = 0.3
-            self.y = 0.2
-            self.z = 0.5
+    @abstractmethod
+    def get_dist(self):
+        '''
+        Get the camera distortion.
+        '''
+        pass
 
-            self.stop_timer = True
-
-            self.is_initialized = True
-        except Exception as e:
-            loginfo("Error " + str(e))
-            self.is_initialized = False
-    
-    def timer_callback(self, event):
-        msg = PoseStamped()
-        
-        msg.pose.position.x = self.x
-        msg.pose.position.y = self.y
-        msg.pose.position.z = self.z
-
-        loginfo("Publiquei x: " + str(msg.pose.position.x))
-        self.publisher_position.publish(msg)
-    
-    def new_pose_callback(self, msg: PoseStamped):
-        self.x = msg.pose.position.x
-        self.y = msg.pose.position.y
-        self.z = msg.pose.position.z
-        loginfo("Atualizou a pose x:" + str(msg.pose.position.x))
-        if self.stop_timer:
-            self.timer_pub.shutdown()
-            self.stop_timer = False
-        self.timer_callback(None)
-
-            
-    def main(self):
-        spin()
-
-if __name__ == "__main__":
-    camera = Camera()
-    camera.main()
+    @abstractmethod
+    def get_frame(self):
+        pass
