@@ -1,27 +1,24 @@
 #! /usr/bin/env python3
-import sys
-from tf.transformations import quaternion_from_euler
-import moveit_commander
-import rospy
+from moveit_commander import RobotCommander, PlanningSceneInterface, MoveGroupCommander, roscpp_initialize
+from rospy import loginfo, spin, init_node, Subscriber, Publisher, DEBUG
 from geometry_msgs.msg._PoseStamped import PoseStamped
 
 class PlanningMoveit():
   def __init__(self) -> None:  
-    rospy.init_node('planning_moveit', anonymous=True, log_level=rospy.DEBUG)
-    rospy.loginfo('Starting the Initialization')
-    print("argv -- ", sys.argv)
+    init_node('planning_moveit', anonymous=True, log_level=DEBUG)
+    loginfo('Starting the Initialization')
 
-    self.subcriber_move = rospy.Subscriber("move_robot", PoseStamped, self.my_move_callback, queue_size=10)
-    self.publisher_pose = rospy.Publisher("new_move", PoseStamped, queue_size=10)
+    self.subcriber_move = Subscriber("move_robot", PoseStamped, self.my_move_callback, queue_size=10)
+    self.publisher_pose = Publisher("new_move", PoseStamped, queue_size=10)
 
     joint_state_topic = ['joint_states:=/my_gen3_lite/joint_states']
-    moveit_commander.roscpp_initialize(joint_state_topic)
+    roscpp_initialize(joint_state_topic)
 
-    self.robot = moveit_commander.RobotCommander(robot_description="/my_gen3_lite/robot_description", ns="my_gen3_lite")
-    self.scene = moveit_commander.PlanningSceneInterface('my_gen3_lite', synchronous=True)
+    self.robot = RobotCommander(robot_description="/my_gen3_lite/robot_description", ns="my_gen3_lite")
+    self.scene = PlanningSceneInterface('my_gen3_lite', synchronous=True)
 
     group_name = "arm"
-    self.move_group = moveit_commander.MoveGroupCommander(group_name, robot_description="/my_gen3_lite/robot_description", ns="my_gen3_lite")
+    self.move_group = MoveGroupCommander(group_name, robot_description="/my_gen3_lite/robot_description", ns="my_gen3_lite")
     self.move_group.set_planner_id("LazyPRMstar")
     self.move_group.set_pose_reference_frame('base_link')
     self.move_group.allow_replanning(False)
@@ -44,9 +41,9 @@ class PlanningMoveit():
   def get_cartesian_pose(self) -> PoseStamped:
     # Get the current pose and display it
     pose = self.move_group.get_current_pose()
-    rospy.loginfo("Actual cartesian pose is : ")
-    rospy.loginfo(pose.pose)
-    rospy.loginfo("Pose type: " + str(type(pose)))
+    loginfo("Actual cartesian pose is : ")
+    loginfo(pose.pose)
+    loginfo("Pose type: " + str(type(pose)))
 
     return pose
   
@@ -62,12 +59,12 @@ class PlanningMoveit():
     self.move_group.set_pose_target(pose)
 
     # Plan and execute
-    rospy.loginfo("Planning and going to the Cartesian Pose")
+    loginfo("Planning and going to the Cartesian Pose")
     return self.move_group.go(wait=True)
   
   def reach_named_position(self, target):    
     # Going to one of those targets
-    rospy.loginfo("Going to named target " + target)
+    loginfo("Going to named target " + target)
     # Set the target
     self.move_group.set_named_target(target)
     # Plan the trajectory
@@ -77,7 +74,7 @@ class PlanningMoveit():
   
   def main(self):
     self.reach_named_position("home")
-    rospy.spin()
+    spin()
     
 
 if __name__ == '__main__':
