@@ -8,6 +8,8 @@ from webcam import Webcam
 from camera import Camera
 from aruco import Aruco
 from kinova_transform import KinovaTransformation
+from std_msgs.msg import String
+from math import degrees
 
 
 class CameraNode():
@@ -18,6 +20,8 @@ class CameraNode():
             loginfo("Using robot_name " + self.robot_name)
 
             self.publisher_position = Publisher("move_robot", PoseStamped, queue_size=10)
+            self.joints_sub = Subscriber("my_joints", String, self.update_joints_value)
+            self.joints = [0, 0, 0, 0, 0, 0]
 
             self.cam = cam
             self.aruco = aruco
@@ -28,36 +32,40 @@ class CameraNode():
             loginfo("Error " + str(e))
             self.is_initialized = False
     
-    def publisher_pose(self, event):
+    def update_joints_value(self, msg: String):
+        ljoint = []
+        for j in msg.data.split(','):
+            j = j.replace('[', '')
+            j = j.replace(']', '')
+            ljoint.append(float(j))
+        
+        for i in range(len(self.joints)):
+            self.joints[i] = degrees(ljoint[i])
+    
+    def publisher_pose(self):
         msg = PoseStamped()
 
-        f = self.cam.get_frame()
-
-        print('O frame', f)
-        
         msg.pose.position.x = self.x
         msg.pose.position.y = self.y
         msg.pose.position.z = self.z
 
-        loginfo("Publiquei x: " + str(msg.pose.position.x))
+        print(f"Publiquei x: {msg.pose.position.x}, y: {msg.pose.position.y} z: {msg.pose.position.z}")
         self.publisher_position.publish(msg)
-    
-    def new_pose_callback(self, msg: PoseStamped):
-        self.x = msg.pose.position.x
-        self.y = msg.pose.position.y
-        self.z = msg.pose.position.z
-        loginfo("Atualizou a pose x:" + str(msg.pose.position.x))
-        self.publisher_pose(None)
 
             
     def main(self):
         answer = ''
         while answer != 'e':
-            frame = self.cam.get_frame()
-            tv, rv, id = self.aruco.marker_pose()
-            print("O que apareceu", tv, rv, id)
-            posicoes = "Tenho que pegar ainda"
-            self.trans.marker_to_base(rv, tv, posicoes)
+            try:
+                tv, rv, id = self.aruco.marker_pose()
+                print(f"TV: {tv}, RV: {rv}")
+                pose = self.trans.marker_to_base(rv, tv, self.joints)
+                self.x = pose[0] / 10
+                self.y = pose[1] / 10
+                self.z = pose[2] / 10
+                self.publisher_pose()
+            except:
+                pass
             
             answer = input("press enter to repit or e to exit")
 

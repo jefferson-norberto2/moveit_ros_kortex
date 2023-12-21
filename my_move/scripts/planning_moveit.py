@@ -2,6 +2,7 @@
 from moveit_commander import RobotCommander, PlanningSceneInterface, MoveGroupCommander, roscpp_initialize
 from rospy import loginfo, spin, init_node, Subscriber, Publisher, DEBUG, Timer, Duration
 from geometry_msgs.msg._PoseStamped import PoseStamped
+from std_msgs.msg import String
 
 class PlanningMoveit():
   def __init__(self) -> None:  
@@ -9,8 +10,8 @@ class PlanningMoveit():
     loginfo('Starting the Initialization')
 
     self.subcriber_move = Subscriber("move_robot", PoseStamped, self.my_move_callback, queue_size=10)
-    self.publisher_pose = Publisher("my_joints", PoseStamped, queue_size=10)
-    self.timer_pub = Timer(Duration(2), self.publish_joints)
+    self.publisher_pose = Publisher("my_joints", String, queue_size=10)
+    self.timer_pub = Timer(Duration(1), self.publish_joints)
 
     joint_state_topic = ['joint_states:=/my_gen3_lite/joint_states']
     roscpp_initialize(joint_state_topic)
@@ -23,17 +24,18 @@ class PlanningMoveit():
     self.move_group.set_planner_id("LazyPRMstar")
     self.move_group.set_pose_reference_frame('base_link')
     self.move_group.allow_replanning(False)
-    self.move_group.set_num_planning_attempts(20)
-    self.move_group.set_planning_time(4)
+    self.move_group.set_num_planning_attempts(100)
+    self.move_group.set_planning_time(10)
     print("planner query id -- ", self.move_group.get_planner_id())
 
-  def publish_joints(self):
-    joinsts = self.move_group.get_joints()
-    print("joints", joinsts)
-    print("type", type(joinsts))
+  def publish_joints(self, event):
+    joinsts = self.move_group.get_current_joint_values()
+    joints = String()
+    joints.data = str(joinsts)
+    self.publisher_pose.publish(joints)
   
   def my_move_callback(self, msg: PoseStamped):
-    print("Recebi o x", msg.pose.position.x)
+    print(f"Recebi o x: {msg.pose.position.x}, y: {msg.pose.position.y} , z: {msg.pose.position.z}", )
     current_pose = self.get_cartesian_pose()
     
     new_pose = current_pose
@@ -46,10 +48,7 @@ class PlanningMoveit():
   def get_cartesian_pose(self) -> PoseStamped:
     # Get the current pose and display it
     pose = self.move_group.get_current_pose()
-    loginfo("Actual cartesian pose is : ")
-    loginfo(pose.pose)
-    loginfo("Pose type: " + str(type(pose)))
-
+    print(f"Current position: {pose.pose.position}")
     return pose
   
   def reach_cartesian_pose(self, pose: PoseStamped, tolerance, constraints):    
